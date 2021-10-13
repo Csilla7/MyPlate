@@ -1,0 +1,52 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    env:
+      MONGO_CONNECTION_URI: ${{ secrets.MONGO_CONNECTION_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_EXPIRE: ${{ secrets.JWT_EXPIRE }}
+      EDAMAM_APP_ID: ${{ secrets.EDAMAM_APP_ID }}
+      EDAMAM_APP_KEY: ${{ secrets.EDAMAM_APP_KEY }}
+      EDAMAM_APP_URL: https://api.edamam.com/api/nutrition-details
+      DELETED_USER_EMAIL: something@mail.com
+      DELETED_USER_PWD: something
+      CLOUDINARY_NAME: ${{ secrets.CLOUDINARY_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+      CLOUDINARY_USERS_IMG_FOLDER: ${{ secrets.CLOUDINARY_USERS_IMG_FOLDER }}
+      CLOUDINARY_MEALS_IMG_FOLDER: ${{ secrets.CLOUDINARY_MEALS_IMG_FOLDER }}
+
+    strategy:
+      matrix:
+        node-version: [15.x]
+        mongodb-version: ['4.4']
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          check-latest: true
+      - name: Start MongoDB v${{ matrix.mongodb-version }}
+        uses: supercharge/mongodb-github-action@1.6.0
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+      - name: Install Dependencies
+        run: yarn install
+        working-directory: ./backend
+      # - name: Run Tests
+      #   run: yarn test:ci
+      #   working-directory: ./backend
+      - name: Run linter
+        run: yarn lint
+        working-directory: ./backend
