@@ -1,0 +1,14 @@
+node_modules/
+output/
+logs/
+.env
+.env.test
+.env.docker
+yarn-error.log
+dist
+coverage
+.yarn/
+.pnp.js
+notes/
+tmp/
+seederData/

@@ -1,0 +1,148 @@
+const labels = [
+  {
+    _id: '61004abaa475d33cd08d1063',
+    name: 'DAIRY_FREE',
+    description: 'No dairy, no lactose',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1080',
+    name: 'ALCOHOL_FREE',
+    description: 'No alcohol used or contained',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1081',
+    name: 'IMMUNO_SUPPORTIVE',
+    description: 'Recipes which fit a science-based approach to eating to strengthen the immune system',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1082',
+    name: 'CELERY_FREE',
+    description: 'Does not contain celery or derivatives',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1083',
+    name: 'CRUSTACEAN_FREE ',
+    description: 'Does not contain crustaceans (shrimp, lobster etc.) or derivatives',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1084',
+    name: 'KOSHER',
+    description: 'Contains only ingredients allowed by the kosher diet. However it does not guarantee kosher preparation of the ingredients themselves',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1085',
+    name: 'MUSTARD_FREE',
+    description: 'Does not contain mustard or derivatives',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1086',
+    name: 'PEANUT_FREE ',
+    description: 'No peanuts or products containing peanuts',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1064',
+    name: 'EGG_FREE',
+    description: 'No eggs or products containing eggs',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1065',
+    name: 'FISH_FREE',
+    description: 'No fish or fish derivatives',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1066',
+    name: 'GLUTEN_FREE',
+    description: 'No ingredients containing gluten',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1067',
+    name: 'KETO_FRIENDLY',
+    description: 'Maximum 7 grams of net carbs per serving',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1068',
+    name: 'PALEO',
+    description: 'Excludes what are perceived to be agricultural products; grains, legumes, dairy products, potatoes, refined salt, refined sugar, and processed oils',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d1069',
+    name: 'SOY_FREE',
+    description: 'No soy or products containing soy',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d106a',
+    name: 'VEGAN',
+    description: 'No meat, poultry, fish, dairy, eggs or honey',
+    type: 'health',
+  },
+  {
+    _id: '61004abaa475d33cd08d106b',
+    name: 'VEGETARIAN',
+    description: 'No meat, poultry, or fish',
+    type: 'health',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9134',
+    name: 'HIGH_FIBER',
+    description: 'More than 5g fiber per serving',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9135',
+    name: 'HIGH_PROTEIN',
+    description: 'More than 50% of total calories from proteins',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9136',
+    name: 'LOW_CARB',
+    description: 'Less than 20% of total calories from carbs',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9137',
+    name: 'LOW_FAT',
+    description: 'Less than 15% of total calories from fat',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9140',
+    name: 'BALANCED',
+    description: 'Protein/Fat/Carb values in 15/35/50 ratio',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9141',
+    name: 'LOW_SODIUM',
+    description: 'Less than 140mg Na per serving',
+    type: 'diet',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9138',
+    name: 'NO_OIL_ADDED',
+    description: 'No oil added except to what is contained in the basic ingredients',
+    type: 'health',
+  },
+  {
+    _id: '6100497c8fa5f30848ff9139',
+    name: 'NO_SUGAR_ADDED',
+    description: 'No simple sugars – glucose, dextrose, galactose, fructose, sucrose, lactose, maltose',
+    type: 'health',
+  },
+];
+
+export default labels;
