@@ -1,1 +1,1 @@
-# MyPlate
+## MyPlate - app for storing and sharing recipes
