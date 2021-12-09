@@ -1,16 +1,19 @@
-import User from '../models/User';
-import Recipe from '../models/Recipe';
 import AuthorizationError from '../utils/AuthorizationError';
 import {
-  validateUsername, validateIntro, validatePassword, validateImage,
+  validateUsername,
+  validateIntro,
+  validatePassword,
+  validateImage,
 } from '../utils/validators';
 import ValidationError from '../utils/ValidationError';
 import { authErrors, userErrors } from '../utils/errorMessages';
-import CloudinaryRepo from './CloudinaryRepository';
+import userRepo from '../repositories/UserRepository';
+import recipeRepo from '../repositories/RecipeRepository';
+import deletedUserData from '../utils/deletedUserData';
 
 export const userService = {
   async getMe(id) {
-    const user = await User.findById(id);
+    const user = await userRepo.getOneById(id);
 
     await this.checkIsDeletedUser(user);
 
@@ -18,7 +21,10 @@ export const userService = {
   },
 
   async getUser(id) {
-    const user = await User.findById(id).select('username image intro');
+    const user = await userRepo.getOneByIdWithSelectedFields(
+      id,
+      'username image intro',
+    );
 
     if (!user) {
       throw new ValidationError(`${userErrors.notFound} (id: ${id})`);
@@ -36,15 +42,15 @@ export const userService = {
       newPassword,
       favorites,
       intro,
-      avatar,
+      image,
     } = dataToBeUpdated;
 
-    const user = await User.findById(id);
+    const user = await userRepo.getOneById(id);
 
     await this.checkIsDeletedUser(user);
 
     if (username) {
-      if (username !== user.username) {
+      if (username !== user.getUsername()) {
         await validateUsername(username);
         username.trim(' ');
         await user.updateOne({ username });
@@ -64,45 +70,32 @@ export const userService = {
       await this.updatePassword(password, newPassword, id);
     }
 
-    if (avatar) {
-      await this.updateImage(user, avatar);
+    if (image) {
+      await this.updateImage(user._id, image);
     }
 
-    const updatedUser = await User.findById(id);
+    // const updatedUser = await User.findById(id);
+    const updatedUser = await userRepo.getOneById(id);
     return { user: updatedUser };
   },
 
   async deleteUser(id) {
-    const user = await User.findById(id);
-
+    const user = await userRepo.getOneById(id);
     await this.checkIsDeletedUser(user);
 
-    const { DELETED_USER_EMAIL, DELETED_USER_PWD } = process.env;
     const { image } = user;
 
-    await user.updateOne({
-      username: 'unknown chef',
-      isDeleted: true,
-      email: DELETED_USER_EMAIL,
-      password: DELETED_USER_PWD,
-      intro: '',
-      favorites: [],
-      image: '',
-    });
+    await user.updateOne(deletedUserData);
 
-    const deletedUser = await User.findById(id);
-
-    if (deletedUser.isDeleted === false) {
+    const deletedUser = await userRepo.getOneById(id);
+    if (!deletedUser.isDeletedUser()) {
       throw new Error(userErrors.failedDeletion);
     }
 
-    await Recipe.updateMany(
-      { markedAsFavoriteBy: id },
-      { $pull: { markedAsFavoriteBy: id } },
-    );
+    await recipeRepo.deleteUserIdFromMarkedAsFavoriteBy(id);
 
     if (image) {
-      await CloudinaryRepo.delete(image);
+      await userRepo.deleteImage(image, id);
     }
 
     return { user };
@@ -115,7 +108,7 @@ export const userService = {
       'newPassword',
       'favorites',
       'intro',
-      'avatar',
+      'image',
     ];
 
     const fieldsToBeUpdated = Object.keys(dataToBeUpdated);
@@ -130,7 +123,7 @@ export const userService = {
   },
 
   async checkIsDeletedUser(user) {
-    if (user.isDeleted) {
+    if (user.isDeletedUser()) {
       throw new AuthorizationError(userErrors.deleted);
     }
   },
@@ -142,7 +135,7 @@ export const userService = {
 
     await validatePassword(newPassword, true);
 
-    const user = await User.findById(id).select('+password');
+    const user = await userRepo.getOneByIdWithSelectedFields(id, '+password');
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       throw new AuthorizationError(authErrors.invalidPwd);
@@ -153,37 +146,30 @@ export const userService = {
   },
 
   async updateFavorites(user, favorites) {
-    const prevFavorites = user.favorites;
+    const prevFavorites = user.getFavorites();
 
     if (prevFavorites.length < favorites.length) {
-      const recipeToBePushed = favorites
-        .filter((recipeId) => !prevFavorites.includes(recipeId));
-
-      await Recipe.updateOne(
-        { _id: recipeToBePushed[0] },
-        { $push: { markedAsFavoriteBy: user._id } },
+      const recipeToBePushed = favorites.filter(
+        (recipeId) => !prevFavorites.includes(recipeId),
       );
+
+      await recipeRepo.updateFavorites(recipeToBePushed[0], user._id, 'push');
     }
 
     if (prevFavorites.length > favorites.length) {
-      const recipeToBePulled = prevFavorites
-        .filter((recipeId) => !favorites.includes(recipeId.toString()));
-
-      await Recipe.updateOne(
-        { _id: recipeToBePulled[0] },
-        { $pull: { markedAsFavoriteBy: user._id } },
+      const recipeToBePulled = prevFavorites.filter(
+        (recipeId) => !favorites.includes(recipeId.toString()),
       );
+
+      await recipeRepo.updateFavorites(recipeToBePulled[0], user._id, 'pull');
     }
 
     await user.updateOne({ favorites });
   },
 
-  async updateImage(user, avatar) {
-    // don't need to delete previous image, it will be overwritten if the public_id is the same
-    await validateImage(avatar);
+  async updateImage(userId, image) {
+    await validateImage(image);
 
-    const publicId = await CloudinaryRepo.save(avatar, 'users', user._id);
-
-    await user.updateOne({ image: publicId });
+    await userRepo.saveImage(image, 'users', userId);
   },
 };

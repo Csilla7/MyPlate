@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import User from './User';
+import CloudinaryRepo from '../repositories/CloudinaryRepository';
 
 const RecipeSchema = new mongoose.Schema({
   name: {
@@ -84,18 +86,28 @@ const RecipeSchema = new mongoose.Schema({
   },
 });
 
-// RecipeSchema.post('deleteOne', { document: true, query: false }, async function () {
-//   await User.updateOne({ recipes: this._id }, { $pull: { recipes: this._id } });
-//   await User.updateMany({ favorites: this._id }, { $pull: { favorites: this._id } });
-//   if (this.image) {
-//     const deletedMeal = await Meal.findByIdAndDelete(this.image);
-//     await fs.unlink(deletedMeal.path, (err) => {
-//       if (err) {
-//         logger.error(`${path.basename(deletedMeal.path)} törlése sikertelen.`);
-//       }
-//     });
-//   }
-// });
+RecipeSchema.post('deleteOne', { document: true, query: false }, async function () {
+  await User.updateOne({ recipes: this._id }, { $pull: { recipes: this._id } });
+  await User.updateMany({ favorites: this._id }, { $pull: { favorites: this._id } });
+
+  if (this.image) {
+    await CloudinaryRepo.delete(this.image);
+  }
+});
+
+RecipeSchema.pre('find', function (next) {
+  this.populate({
+    path: 'creator',
+    select: 'username image',
+  });
+  this.populate('labels');
+  this.populate('category');
+  next();
+});
+
+RecipeSchema.methods.isCreator = function (userId) {
+  return this.creator.toString() === userId;
+};
 
 const Recipe = mongoose.model('Recipe', RecipeSchema);
 

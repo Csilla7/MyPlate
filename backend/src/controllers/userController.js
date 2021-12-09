@@ -36,11 +36,10 @@ export const userController = {
 
   async updateUser(req, res, next) {
     const { id } = req.user;
-    const { avatar } = req.files;
 
     const dataToBeUpdated = {
       ...req.body,
-      avatar,
+      image: req.files?.image || null,
     };
 
     try {

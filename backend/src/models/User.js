@@ -64,6 +64,18 @@ UserSchema.methods.matchPassword = async function (enteredPassword) {
   return isMatch;
 };
 
+UserSchema.methods.isDeletedUser = function () {
+  return this.isDeleted;
+};
+
+UserSchema.methods.getUsername = function () {
+  return this.username;
+};
+
+UserSchema.methods.getFavorites = function () {
+  return this.favorites;
+};
+
 const User = mongoose.model('User', UserSchema);
 
 export default User;

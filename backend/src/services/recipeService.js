@@ -1,14 +1,11 @@
 import fetch from 'node-fetch';
-import Recipe from '../models/Recipe';
-import Label from '../models/Label';
-import User from '../models/User';
-import Category from '../models/Category';
 import ValidationError from '../utils/ValidationError';
 import AuthorizationError from '../utils/AuthorizationError';
 import { validateRecipe, checkCalories, validateImage } from '../utils/validators';
 import logger from '../logger';
 import { recipeErrors } from '../utils/errorMessages';
-import CloudinaryRepo from './CloudinaryRepository';
+import recipeRepo from '../repositories/RecipeRepository';
+import { categoryRepo, labelRepo } from '../repositories/CategoriesRepository';
 
 export const recipeService = {
   async createRecipe(id, recipe, mealImage) {
@@ -20,43 +17,23 @@ export const recipeService = {
       labels,
     } = await this.getNutritionalInfoFromRecipeIngredients(ingredients);
 
-    const user = await User.findById(id);
-    const newRecipe = await Recipe.create({
+    let newRecipe = await recipeRepo.createRecipe({
       ...recipe,
-      creator: user._id,
+      creator: id,
       nutrients,
       labels,
     });
 
     if (mealImage) {
-      await validateImage(mealImage);
-      const publicId = await CloudinaryRepo.save(mealImage, 'meals', newRecipe._id);
-
-      await newRecipe.updateOne({ image: publicId });
+      newRecipe = await this.updateImage(newRecipe._id, mealImage);
     }
 
-    user.recipes.push(newRecipe._id);
-    await user.save();
-
-    const savedRecipe = await Recipe.findById(newRecipe._id);
-
-    return { recipe: savedRecipe };
+    return { recipe: newRecipe };
   },
 
   async getSingleRecipe(recipeId) {
-    const recipe = await Recipe.findById(recipeId)
-      .populate({
-        path: 'creator',
-        select: 'username image',
-      })
-      .populate('labels')
-      .populate('category')
-      .catch((err) => {
-        logger.error(err.message);
-        throw new Error(recipeErrors.notFound);
-      });
+    const recipe = await recipeRepo.getOneById(recipeId);
 
-    // why is it here?
     if (!recipe) {
       throw new Error(recipeErrors.notFound);
     }
@@ -65,16 +42,7 @@ export const recipeService = {
   },
 
   async getListOfRecipes(queryParams) {
-    const reqQuery = { ...queryParams };
-
-    const removeFields = ['select', 'sort', 'page', 'limit'];
-    removeFields.forEach((param) => delete reqQuery[param]);
-
-    const queryStr = await this.insert$ToQuery(reqQuery);
-
-    const reParsedQuery = await this.reParseQuery(queryStr, reqQuery);
-
-    const data = await this.chainingQuery(reParsedQuery, queryParams);
+    const data = await recipeRepo.getRecipeListByQuery(queryParams);
 
     return data;
   },
@@ -82,20 +50,18 @@ export const recipeService = {
   async updateRecipe(userId, recipeId, dataToBeUpdated, mealImage) {
     await validateRecipe(dataToBeUpdated);
 
-    const recipe = await Recipe.findById(recipeId).catch((err) => {
-      logger.error(err.message);
-      throw new Error(`${recipeErrors.notFound} (id: ${recipeId})`);
-    });
+    const recipe = await recipeRepo.getOneById(recipeId);
 
-    if (recipe.creator.toString() !== userId) {
+    if (!recipe) {
+      throw new Error(`${recipeErrors.notFound} (id: ${recipeId})`);
+    }
+
+    if (!recipe.isCreator(userId)) {
       throw new AuthorizationError(recipeErrors.cannotUpdate);
     }
 
     if (mealImage) {
-      await validateImage(mealImage);
-      const publicId = await CloudinaryRepo.save(mealImage, 'meals', recipeId);
-
-      recipe.image = publicId;
+      await this.updateImage(recipeId, mealImage);
     }
 
     const recipeIngredients = JSON.stringify(recipe.ingredients);
@@ -116,20 +82,20 @@ export const recipeService = {
 
     await recipe.save();
 
-    const updatedRecipe = await Recipe.findById(recipeId);
+    const updatedRecipe = await recipeRepo.getOneById(recipeId);
 
     return { recipe: updatedRecipe };
   },
 
   async deleteRecipe(userId, recipeId) {
-    const recipe = await Recipe.findById(recipeId);
+    const recipe = await recipeRepo.getOneById(recipeId);
 
     if (!recipe) {
       throw new Error(`${recipeErrors.notFound} (id: ${recipeId})`);
     }
 
-    if (recipe.creator.toString() !== userId) {
-      throw new AuthorizationError(recipeErrors.cannotDelete);
+    if (!recipe.isCreator(userId)) {
+      throw new AuthorizationError(recipeErrors.cannotUpdate);
     }
 
     const deletedRecipe = await recipe.deleteOne();
@@ -138,8 +104,6 @@ export const recipeService = {
       throw new Error(recipeErrors.failedDeletion);
     }
 
-    await CloudinaryRepo.delete(deletedRecipe.image);
-
     return { recipe: deletedRecipe };
   },
 
@@ -147,15 +111,14 @@ export const recipeService = {
     let categories = [];
 
     if (category === 'categories') {
-      categories = await Category.find();
+      categories = await categoryRepo.getAll();
     } else if (category === 'labels') {
-      categories = await Label.find();
+      categories = await labelRepo.getAll();
     }
 
     return categories;
   },
 
-  // stay here
   async getRecipeInfo(ingredients) {
     const nutritionApiUrl = new URL(process.env.EDAMAM_APP_URL);
     const params = new URLSearchParams({
@@ -214,7 +177,7 @@ export const recipeService = {
   },
 
   async getLabelsToSave(dietLabels, healthLabels) {
-    const labels = await Label.find();
+    const labels = await labelRepo.getAll();
     const labelsToSave = [];
     labels.forEach((doc) => {
       if (dietLabels.includes(doc.name) || healthLabels.includes(doc.name)) {
@@ -231,86 +194,10 @@ export const recipeService = {
     return result;
   },
 
-  async generateRegexQuery(str) {
-    return {
-      $regex: new RegExp(str),
-      $options: 'i',
-    };
-  },
+  async updateImage(recipeId, image) {
+    await validateImage(image);
 
-  async insert$ToQuery(reqQuery) {
-    let queryStr = JSON.stringify(reqQuery);
-    queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, (match) => `$${match}`);
-
-    return queryStr;
-  },
-
-  async reParseQuery(queryStr, reqQuery) {
-    const reParsedQuery = JSON.parse(queryStr);
-    if (reParsedQuery.name) {
-      reParsedQuery.name = await this.generateRegexQuery(reqQuery.name);
-    }
-    if (reParsedQuery.ingredients) {
-      reParsedQuery.ingredients = await this.generateRegexQuery(reqQuery.ingredients);
-    }
-
-    return reParsedQuery;
-  },
-
-  async chainingQuery(reParsedQuery, queryParams) {
-    let query = Recipe.find(reParsedQuery);
-    // select('field otherfield')
-    if (queryParams.select) {
-      const fields = queryParams.select.split(',').join(' ');
-      query = query.select(fields);
-    }
-
-    if (queryParams.sort) {
-      const sortBy = queryParams.sort.split(',').join(' ');
-      query = query.sort(sortBy);
-    }
-
-    const page = parseInt(queryParams.page, 10) || 1;
-    const limit = parseInt(queryParams.limit, 10) || 12;
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const total = await Recipe.countDocuments();
-
-    query = query.skip(startIndex).limit(limit);
-
-    query = query
-      .populate({
-        path: 'creator',
-        select: 'username avatar',
-        populate: { path: 'avatar', select: 'url' },
-      })
-      .populate({
-        path: 'image',
-        select: 'url',
-      });
-
-    const recipeList = await query;
-    let message = '';
-    if (recipeList.length === 0) {
-      message = 'Nincs találat.';
-    }
-
-    const pagination = {};
-
-    if (endIndex < total) {
-      pagination.next = {
-        page: page + 1,
-      };
-    }
-
-    if (startIndex > 0) {
-      pagination.prev = {
-        page: page - 1,
-      };
-    }
-
-    pagination.limit = limit;
-
-    return { pagination, recipeList, message };
+    const updatedRecipe = await recipeRepo.saveImage(image, 'meals', recipeId);
+    return updatedRecipe;
   },
 };
